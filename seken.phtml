@@ -1,0 +1,503 @@
+<?php
+/*
+ * Backdoor Scanner v2.4 - Copy Path Feature
+ * Original author: sohay
+ * Enhanced by: AI Assistant
+ * Features: Copy all paths by threat level to clipboard
+ */
+
+// CSS Styling
+echo '<style>
+body {background-color:#000;color:green;font-family: "Courier New", monospace;} 
+.header {border:2px solid #00ff00;padding:10px;margin-bottom:20px;background:#0a0a0a;}
+.scanner-box {border:1px solid #00ff00;padding:10px;margin:10px 0;}
+.threat-critical {color:#ff0000;font-weight:bold;}
+.threat-high {color:#ff6600;font-weight:bold;}
+.threat-medium {color:#ffaa00;}
+.threat-low {color:#ffff00;}
+.threat-auth {color:#ff00ff;font-weight:bold;text-shadow: 0 0 5px #ff00ff;}
+.safe {color:#00ff00;}
+.info {color:#00ffff;}
+.button {background:#003300;color:#00ff00;border:1px solid #00ff00;padding:5px 10px;cursor:pointer;margin:2px;}
+.button:hover {background:#00ff00;color:#000;}
+.button.active {background:#00ff00;color:#000;}
+.copy-btn {background:#004400;border:1px solid #00ff00;}
+.copy-btn:hover {background:#00aa00;color:#fff;}
+.copy-success {background:#00ff00;color:#000;}
+input[type="text"] {width:500px;background:#000;color:#00ff00;border:1px solid #00ff00;padding:5px;}
+textarea {background:#000;color:#00ff00;border:1px solid #00ff00;width:100%;font-family:monospace;resize:vertical;}
+.full-code-view {max-height:500px;overflow-y:auto;border:2px solid #00ff00;padding:5px;background:#0a0a0a;}
+.footer {text-align:center;margin-top:20px;padding:10px;border-top:1px solid #00ff00;}
+.filter-controls {background:#0a0a0a;border:1px solid #00ff00;padding:10px;margin:10px 0;}
+.threat-item {display:none;}
+.threat-item.show {display:block;}
+.filter-stats {float:right;color:#00ffff;padding:5px;}
+.copy-notification {position:fixed;top:50%;left:50%;transform:translate(-50%, -50%);background:#00ff00;color:#000;padding:20px;border:2px solid #000;display:none;z-index:9999;font-weight:bold;box-shadow:0 0 20px #00ff00;}
+.path-display {background:#0a0a0a;border:1px solid #00ff00;padding:5px;margin:5px 0;font-size:11px;word-break:break-all;}
+</style>';
+
+// JavaScript for filtering and copy functionality
+echo '<script>
+// Store paths by threat level
+var threatPaths = {
+    level13: [],
+    level8to12: [],
+    level5to7: [],
+    level3to4: [],
+    level1to2: [],
+    all: []
+};
+
+function filterThreats(level) {
+    var items = document.getElementsByClassName("threat-item");
+    var buttons = document.getElementsByClassName("filter-btn");
+    var count = 0;
+    
+    for(var i = 0; i < buttons.length; i++) {
+        buttons[i].classList.remove("active");
+    }
+    
+    event.target.classList.add("active");
+    
+    for(var i = 0; i < items.length; i++) {
+        if(level === "all") {
+            items[i].classList.add("show");
+            count++;
+        } else if(level === "auth" && items[i].getAttribute("data-level") >= 13) {
+            items[i].classList.add("show");
+            count++;
+        } else if(level === "critical" && items[i].getAttribute("data-level") >= 8 && items[i].getAttribute("data-level") < 13) {
+            items[i].classList.add("show");
+            count++;
+        } else if(level === "high" && items[i].getAttribute("data-level") >= 5 && items[i].getAttribute("data-level") < 8) {
+            items[i].classList.add("show");
+            count++;
+        } else if(level === "medium" && items[i].getAttribute("data-level") >= 3 && items[i].getAttribute("data-level") < 5) {
+            items[i].classList.add("show");
+            count++;
+        } else if(level === "low" && items[i].getAttribute("data-level") < 3) {
+            items[i].classList.add("show");
+            count++;
+        } else {
+            items[i].classList.remove("show");
+        }
+    }
+    
+    document.getElementById("filter-count").innerHTML = "Showing: " + count + " threats";
+}
+
+function toggleFullCode(id) {
+    var element = document.getElementById(id);
+    var button = event.target;
+    if(element.style.display === "none" || element.style.display === "") {
+        element.style.display = "block";
+        button.innerHTML = "Hide Code";
+    } else {
+        element.style.display = "none";
+        button.innerHTML = "View Full Code";
+    }
+}
+
+function copyPaths(level) {
+    var paths = [];
+    
+    switch(level) {
+        case "level13":
+            paths = threatPaths.level13;
+            break;
+        case "level8to12":
+            paths = threatPaths.level8to12;
+            break;
+        case "level5to7":
+            paths = threatPaths.level5to7;
+            break;
+        case "level3to4":
+            paths = threatPaths.level3to4;
+            break;
+        case "level1to2":
+            paths = threatPaths.level1to2;
+            break;
+        case "all":
+            paths = threatPaths.all;
+            break;
+    }
+    
+    if(paths.length === 0) {
+        alert("No threats found in this category");
+        return;
+    }
+    
+    var pathText = paths.join("\n");
+    
+    // Create temporary textarea to copy
+    var tempTextarea = document.createElement("textarea");
+    tempTextarea.value = pathText;
+    tempTextarea.style.position = "fixed";
+    tempTextarea.style.top = "-9999px";
+    document.body.appendChild(tempTextarea);
+    tempTextarea.select();
+    tempTextarea.setSelectionRange(0, 99999); // For mobile devices
+    
+    try {
+        var successful = document.execCommand("copy");
+        if(successful) {
+            showCopyNotification(paths.length + " paths copied to clipboard!");
+            
+            // Change button color temporarily
+            var btn = event.target;
+            btn.classList.add("copy-success");
+            setTimeout(function() {
+                btn.classList.remove("copy-success");
+            }, 2000);
+        }
+    } catch(err) {
+        alert("Failed to copy. Please try again.");
+    }
+    
+    document.body.removeChild(tempTextarea);
+}
+
+function showCopyNotification(message) {
+    var notification = document.getElementById("copy-notification");
+    if(!notification) {
+        notification = document.createElement("div");
+        notification.id = "copy-notification";
+        notification.className = "copy-notification";
+        document.body.appendChild(notification);
+    }
+    notification.innerHTML = message;
+    notification.style.display = "block";
+    setTimeout(function() {
+        notification.style.display = "none";
+    }, 2000);
+}
+
+function addThreatPath(path, level) {
+    threatPaths.all.push(path);
+    
+    if(level >= 13) {
+        threatPaths.level13.push(path);
+    } else if(level >= 8) {
+        threatPaths.level8to12.push(path);
+    } else if(level >= 5) {
+        threatPaths.level5to7.push(path);
+    } else if(level >= 3) {
+        threatPaths.level3to4.push(path);
+    } else {
+        threatPaths.level1to2.push(path);
+    }
+}
+
+window.onload = function() {
+    filterThreats("all");
+}
+</script>';
+
+// Configuration
+set_time_limit(0);
+error_reporting(0);
+@ini_set('zlib.output_compression', 0);
+@ini_set('implicit_flush', 1);
+for($i = 0; $i < ob_get_level(); $i++) { ob_end_flush(); }
+ob_implicit_flush(1);
+
+// Global variables
+$total_files_scanned = 0;
+$threats_found = 0;
+$scan_start_time = microtime(true);
+$threat_results = [];
+
+// Path handling
+$path = getcwd();
+if(isset($_GET['dir'])){
+    $path = $_GET['dir'];
+}
+
+// Header
+echo '<div class="header">';
+echo '<h1 style="color:#00ff00;margin:0;">🛡️ Skentot V.2 NagaEmasBumi</h1>';
+echo '</div>';
+
+// Self delete option
+if(isset($_GET['kill'])){
+    unlink(__FILE__);
+    echo '<div class="scanner-box"><span class="info">Scanner self-deleted successfully!</span></div>';
+    exit;
+}
+
+// Delete file action
+if(isset($_GET['delete'])){
+    $file_to_delete = $_GET['delete'];
+    $backup_name = $file_to_delete . '.quarantine.' . time();
+    
+    @copy($file_to_delete, $backup_name);
+    @unlink($file_to_delete);
+    
+    $status = file_exists($file_to_delete) ? 
+        '<span class="threat-critical">FAILED</span>' : 
+        '<span class="safe">SUCCESS - Backup: ' . basename($backup_name) . '</span>';
+    
+    echo '<div class="scanner-box">';
+    echo 'Deletion attempt: <span class="info">' . $file_to_delete . '</span><br>';
+    echo 'Status: ' . $status;
+    echo '</div>';
+}
+
+// Control Panel
+echo '<div class="scanner-box">';
+echo '<form action="" method="get">';
+echo '<label>Directory to scan: </label>';
+echo '<input type="text" name="dir" value="'.$path.'">';
+echo '<input type="submit" value="🔍 Start Scan" class="button">';
+echo '</form>';
+echo '<div style="margin-top:10px;">';
+echo '<a href="?kill" onclick="return confirm(\'Delete this scanner?\')"><button class="button">🗑️ Self Delete</button></a> ';
+echo '<a href="?dir='.$path.'&export=1"><button class="button">📥 Export Results</button></a> ';
+echo '<a href="?dir='.$path.'&deep=1"><button class="button">🔬 Deep Scan</button></a>';
+echo '</div>';
+echo '</div>';
+
+// Pattern definitions
+class PatternDetector {
+    
+    // Authentication backdoor patterns (Level 13)
+    public static $auth_backdoor_patterns = [
+        'bcrypt_hardcoded' => '/\$2[ayb]\$[0-9]{2}\$[a-zA-Z0-9\.\/]{53}/',
+        'password_verify_session' => '/password_verify\s*\([^)]+\)\s*\)\s*{\s*\$_SESSION\[[\'"][^\'"]+[\'"]\]\s*=\s*true/',
+        'auth_users_array' => '/\$auth_users\s*=\s*array\s*\([^)]*\$2[ayb]\$/',
+        'md5_auth' => '/md5\s*\(\s*\$_(POST|GET|REQUEST)\[[\'"]password[\'"]\]\s*\)\s*===/',
+        'session_loggedin' => '/\$_SESSION\[[\'"]loggedin[\'"]\]\s*=\s*true/',
+        'hardcoded_hash' => '/\$(password_?hash|hashed_?password|stored_?hash)\s*=\s*[\'"][a-f0-9]{32}[\'"]/',
+        'hex_obfuscated_globals' => '/\$\{"\\\\x[0-9a-fA-F]{2}/',
+        'globals_obfuscation' => '/\$\{["\']G\\\\x4c\\\\x4f\\\\x42\\\\x41\\\\x4c\\\\x53/',
+        'verify_login_function' => '/function\s+verify_login\s*\([^)]*\)\s*{[^}]*password_verify/',
+        'session_coki' => '/\$_SESSION\[[\'"]coki[\'"]\]/',
+    ];
+    
+    // Critical backdoor patterns (Level 8-12)
+    public static $critical_patterns = [
+        'remote_eval' => '/eval\s*\([^)]*\$_(GET|POST|REQUEST|COOKIE|SESSION)\[/',
+        'base64_eval' => '/eval\s*\(\s*base64_decode\s*\(/',
+        'system_input' => '/(system|exec|shell_exec|passthru)\s*\(\s*\$_(GET|POST|REQUEST)/',
+        'dynamic_func' => '/\$[a-zA-Z_][a-zA-Z0-9_]*\s*\(\s*\$_(GET|POST|REQUEST)/',
+        'assert_string' => '/assert\s*\(\s*[\'"].*\$.*[\'"]/',
+        'create_func' => '/create_function\s*\(\s*[\'"][\'"],\s*\$_(GET|POST|REQUEST)/',
+        'eval_exit' => '/eval\s*\([\'"]\\?>[\'"]\s*\.\s*\$/',
+        'preg_e' => '/preg_replace.*\/e[\'"]/',
+        'geturlsinfo' => '/geturlsinfo\s*\([^)]*https?:/',
+    ];
+    
+    // High risk patterns (Level 5-7)
+    public static $high_patterns = [
+        'eval_var' => '/eval\s*\(\s*\$[a-zA-Z_]/',
+        'include_var' => '/(include|require)(_once)?\s*\(\s*\$/',
+        'fopen_http' => '/fopen\s*\([\'"]https?:\/\//',
+        'curl_exec' => '/curl_exec\s*\(/',
+        'file_get_http' => '/file_get_contents\s*\([\'"]https?:\/\//',
+        'hex_chars' => '/\\\\x[0-9a-fA-F]{2}\\\\x[0-9a-fA-F]{2}/',
+        'gzinflate' => '/gzinflate\s*\(\s*base64_decode/',
+        'str_rot13' => '/str_rot13\s*\([\'"]/',
+    ];
+    
+    // Webshell signatures
+    public static $webshell_signatures = [
+        'c99' => '/c99shell|c99madshell/',
+        'r57' => '/r57shell|r57\s+Shell/',
+        'wso' => '/WSO\s+[0-9.]+|wso\s+shell/i',
+        'b374k' => '/b374k|b374k\s+shell/i',
+        'weevely' => '/weevely/i',
+        'alfa' => '/alfa\s+shell|alfashell/i',
+        'indoxploit' => '/indoxploit/i',
+        'mini_shell' => '/mini\s+shell|minishell/i',
+    ];
+}
+
+// Backdoor checking function
+function checkBackdoor($file_location) {
+    global $path, $threats_found, $threat_results;
+    
+    $contents = @file_get_contents($file_location);
+    if(strlen($contents) == 0) return;
+    
+    $threat_level = 0;
+    $threats = [];
+    $matched_patterns = [];
+    
+    // Check authentication backdoor patterns (Level 13)
+    foreach(PatternDetector::$auth_backdoor_patterns as $name => $pattern) {
+        if(preg_match($pattern, $contents, $matches)) {
+            $threat_level = 13;
+            $threats[] = "AUTH-BACKDOOR: " . str_replace('_', ' ', $name);
+            $matched_patterns[] = isset($matches[0]) ? $matches[0] : '';
+        }
+    }
+    
+    // Check other patterns if not level 13
+    if($threat_level < 13) {
+        foreach(PatternDetector::$critical_patterns as $name => $pattern) {
+            if(preg_match($pattern, $contents, $matches)) {
+                $threat_level = max($threat_level, 8);
+                $threats[] = "Critical: " . str_replace('_', ' ', $name);
+            }
+        }
+        
+        foreach(PatternDetector::$high_patterns as $name => $pattern) {
+            if(preg_match($pattern, $contents, $matches)) {
+                $threat_level = max($threat_level, 5);
+                $threats[] = "High: " . str_replace('_', ' ', $name);
+            }
+        }
+        
+        foreach(PatternDetector::$webshell_signatures as $name => $pattern) {
+            if(preg_match($pattern, $contents)) {
+                $threat_level = max($threat_level, 7);
+                $threats[] = "Webshell: $name";
+            }
+        }
+    }
+    
+    if($threat_level > 0) {
+        $threats_found++;
+        $threat_results[] = [
+            'level' => $threat_level,
+            'file' => $file_location,
+            'threats' => $threats,
+            'patterns' => $matched_patterns,
+            'full_content' => $contents,
+            'file_size' => strlen($contents),
+            'lines' => substr_count($contents, "\n") + 1
+        ];
+    }
+}
+
+// Scanning function
+function scanBackdoor($current_dir, $deep_scan = false) {
+    global $total_files_scanned;
+    
+    if(!is_readable($current_dir)) return;
+    
+    $dir_location = @scandir($current_dir);
+    if(!$dir_location) return;
+    
+    foreach($dir_location as $file) {
+        if($file === "." || $file === "..") continue;
+        
+        $file_location = str_replace("//", "/", $current_dir.'/'.$file);
+        
+        if(is_dir($file_location)) {
+            scanBackdoor($file_location, $deep_scan);
+        } else {
+            $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+            $scan_extensions = ['php', 'phtml', 'php3', 'php4', 'php5', 'php7', 'phps', 'phar'];
+            
+            if(in_array($extension, $scan_extensions)) {
+                $total_files_scanned++;
+                checkBackdoor($file_location);
+            }
+        }
+    }
+}
+
+// Save function
+function save($fname, $value) {
+    $file = @fopen($fname, "a");
+    if($file) {
+        fwrite($file, $value);
+        fclose($file);
+    }
+}
+
+// Start scanning
+echo '<div class="scanner-box"><span class="info">🔍 Scanning in progress...</span></div>';
+flush();
+
+$deep_scan = isset($_GET['deep']);
+scanBackdoor($path, $deep_scan);
+
+// Filter Controls
+echo '<div class="filter-controls">';
+echo '<strong>🎯 Filter Results:</strong> ';
+echo '<button class="button filter-btn active" onclick="filterThreats(\'all\')">All</button>';
+echo '<button class="button filter-btn" onclick="filterThreats(\'auth\')">Level 13+</button>';
+echo '<button class="button filter-btn" onclick="filterThreats(\'critical\')">Level 8-12</button>';
+echo '<button class="button filter-btn" onclick="filterThreats(\'high\')">Level 5-7</button>';
+echo '<button class="button filter-btn" onclick="filterThreats(\'medium\')">Level 3-4</button>';
+echo '<button class="button filter-btn" onclick="filterThreats(\'low\')">Level 1-2</button>';
+echo '<span class="filter-stats" id="filter-count">Showing: 0 threats</span>';
+echo '</div>';
+
+// Display results
+echo '<div id="threat-container">';
+
+usort($threat_results, function($a, $b) {
+    return $b['level'] - $a['level'];
+});
+
+foreach($threat_results as $idx => $result) {
+    echo '<script>addThreatPath("'.addslashes($result['file']).'", '.$result['level'].');</script>';
+    
+    $threat_class = 'threat-low';
+    $emoji = '⚠️';
+    
+    if($result['level'] >= 13) {
+        $threat_class = 'threat-auth';
+        $emoji = '🔐';
+    } elseif($result['level'] >= 8) {
+        $threat_class = 'threat-critical';
+        $emoji = '☠️';
+    } elseif($result['level'] >= 5) {
+        $threat_class = 'threat-high';
+        $emoji = '⚠️';
+    } elseif($result['level'] >= 3) {
+        $threat_class = 'threat-medium';
+        $emoji = '⚡';
+    }
+    
+    $unique_id = 'code_' . md5($result['file']) . '_' . $idx;
+    
+    echo '<div class="scanner-box threat-item" data-level="'.$result['level'].'">';
+    echo '<span class="'.$threat_class.'">'.$emoji.' Level: '.$result['level'].'</span> ';
+    echo '<span class="info">'.htmlspecialchars($result['file']).'</span><br>';
+    echo '<small>'.implode(', ', $result['threats']).'</small><br>';
+    echo '<div style="margin-top:5px;">';
+    echo '<a href="?delete='.$result['file'].'&dir='.$path.'"><button class="button">Delete</button></a> ';
+    echo '<button class="button" onclick="toggleFullCode(\''.$unique_id.'\')">View Code</button>';
+    echo '</div>';
+    echo '<div id="'.$unique_id.'" style="display:none;margin-top:10px;">';
+    echo '<div class="full-code-view">';
+    echo '<pre>'.htmlspecialchars($result['full_content']).'</pre>';
+    echo '</div>';
+    echo '</div>';
+    echo '</div>';
+}
+
+echo '</div>';
+
+// Summary with copy buttons
+$auth_threats = count(array_filter($threat_results, function($r) { return $r['level'] >= 13; }));
+$critical_threats = count(array_filter($threat_results, function($r) { return $r['level'] >= 8 && $r['level'] < 13; }));
+$high_threats = count(array_filter($threat_results, function($r) { return $r['level'] >= 5 && $r['level'] < 8; }));
+$medium_threats = count(array_filter($threat_results, function($r) { return $r['level'] >= 3 && $r['level'] < 5; }));
+$low_threats = count(array_filter($threat_results, function($r) { return $r['level'] < 3; }));
+
+echo '<div class="scanner-box" style="background:#0a0a0a;">';
+echo '<h3 style="color:#00ff00;">📊 Scan Summary</h3>';
+echo '<table width="100%">';
+echo '<tr><td>🔐 Level 13: '.$auth_threats.'</td><td align="right">'.($auth_threats > 0 ? '<button class="button copy-btn" onclick="copyPaths(\'level13\')">📋 Copy Paths</button>' : '').'</td></tr>';
+echo '<tr><td>☠️ Level 8-12: '.$critical_threats.'</td><td align="right">'.($critical_threats > 0 ? '<button class="button copy-btn" onclick="copyPaths(\'level8to12\')">📋 Copy Paths</button>' : '').'</td></tr>';
+echo '<tr><td>⚠️ Level 5-7: '.$high_threats.'</td><td align="right">'.($high_threats > 0 ? '<button class="button copy-btn" onclick="copyPaths(\'level5to7\')">📋 Copy Paths</button>' : '').'</td></tr>';
+echo '<tr><td>⚡ Level 3-4: '.$medium_threats.'</td><td align="right">'.($medium_threats > 0 ? '<button class="button copy-btn" onclick="copyPaths(\'level3to4\')">📋 Copy Paths</button>' : '').'</td></tr>';
+echo '<tr><td>💡 Level 1-2: '.$low_threats.'</td><td align="right">'.($low_threats > 0 ? '<button class="button copy-btn" onclick="copyPaths(\'level1to2\')">📋 Copy Paths</button>' : '').'</td></tr>';
+echo '<tr><td colspan="2"><hr style="border-color:#00ff00;"></td></tr>';
+echo '<tr><td><strong>Total: '.$threats_found.'</strong></td><td align="right">'.($threats_found > 0 ? '<button class="button copy-btn" style="background:#005500;" onclick="copyPaths(\'all\')">📋 Copy All Paths</button>' : '').'</td></tr>';
+echo '</table>';
+echo '</div>';
+
+// Footer
+echo '<div class="footer">';
+echo 'Backdoor Scanner v2.4 | Copy Path Feature<br>';
+echo '<small>Click "Copy Paths" to copy all file paths for each threat level</small>';
+echo '</div>';
+
+echo '<script>document.title = "Scan Complete - '.$threats_found.' threats";</script>';
+?>
